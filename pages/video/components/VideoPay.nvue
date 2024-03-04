@@ -1,0 +1,355 @@
+<!--
+ * @Description:
+ * @Author: FYT1996
+ * @Date: 2023-08-16 09:20:51
+ * @LastEditor: FYT1996
+ * @LastEditTime: 2023-12-06 11:03:23
+ * @Copyright: by 南阳迈特网络科技有限公司 禁止任何形式（包含二次开发）转售系统源码，违者必究。
+-->
+
+
+<template>
+	<view class="VideoPay" :class="{ active: show }" :style="[{ height: winHeight + 'px' }]" @click="$emit('close')">
+		<view class="popup" :style="[{ height: winHeight * 0.6 + 'px' }]" @click.stop="">
+			<view class="p_head">
+				<view class="left">
+					<text class="text1">{{ getApp.$t('play.support') }}</text>
+				</view>
+				<text class="right" :style="'color:' + global.isColor" @click="$emit('close')">{{ getApp.$t('text.close') }}</text>
+			</view>
+			<view class="p_text">
+				<view class="left">
+					<text class="text1">{{ getApp.$t('play.episode') }}：</text>
+					<text class="text2" :style="'color:' + global.isColor">{{ price }}{{ getApp.$t('text.integral') }}</text>
+				</view>
+				<text class="right">{{ getApp.$t('play.balance') }}：{{ userInfo.usable || 0 }}{{ getApp.$t('text.integral') }}</text>
+			</view>
+			<view class="p_list">
+				<waterfall column-count="2" column-width="auto" column-gap="20" left-gap="20" right-gap="20">
+					<cell v-for="(item, index) in integralData" :key="index">
+						<view class="item" @click="touchPrePay('integral', item.id, item.price)">
+							<view class="content">
+								<view class="line1">
+									<text class="text1">{{ item.price }}</text>
+									<text class="text2">{{ currency }}</text>
+								</view>
+								<view class="line2">
+									<text class="text1">{{ item.original_usable }}</text>
+									<text class="text2" v-if="item.give_usable">+{{ item.give_usable }}</text>
+									<text class="text2">{{ getApp.$t('text.integral') }}</text>
+								</view>
+							</view>
+							<text class="badge" v-if="item.flag">{{ item.flag }}</text>
+						</view>
+					</cell>
+					<cell v-for="(item, index) in vipData" :key="index">
+						<view class="item" @click="touchPrePay('member', item.id, item.price)">
+							<view class="content">
+								<view class="line1">
+									<text class="text1">{{ item.price }}</text>
+									<text class="text2">{{ currency }}</text>
+								</view>
+								<view class="line2">
+									<text class="text2">{{ getApp.$t('play.free') }}</text>
+								</view>
+							</view>
+							<text class="tips">{{ getApp.$t('text.inactive') }}</text>
+							<text class="ltip">{{ item.num > 1 ? item.num : "" }} {{ item.type_text }}</text>
+						</view>
+					</cell>
+				</waterfall>
+			</view>
+			<text class="p_info">{{ getApp.$t('play.tips') }}</text>
+		</view>
+		<CustomPayment :show="isPayShow" :type="type" :data="prepay" @close="isPayShow = false" />
+	</view>
+</template>
+
+<script>
+	import CustomPayment from '@/components/CustomPayment.vue'
+	import { mapState, mapGetters, mapMutations, mapActions } from "vuex"
+	export default {
+		components: { CustomPayment },
+		name: "VideoPayNvue",
+		props: {
+			show: {
+				type: Boolean,
+				default: false
+			},
+			price: {
+				type: Number,
+				default: 0
+			}
+		},
+		data() {
+			return {
+				getApp: getApp(),
+				global: getApp().globalData,
+				winWidth: 0,
+				winHeight: 0,
+				integralData: [],
+				vipData: [],
+				isPayShow: false,
+				type: "",
+				prepay: {}
+			};
+		},
+		computed: {
+			...mapGetters("user", ["token", "userInfo"]),
+			...mapGetters("app", ["currency"])
+		},
+		watch: {
+			show(newValue, oldValue) {
+				if(newValue) {
+					this.token && this.getUserInfo()
+				}
+			}
+		},
+		created() {
+			this.getIntegralList()
+			this.getVipList()
+		},
+		mounted() {
+			this.winWidth = uni.getSystemInfoSync().windowWidth
+			this.winHeight = uni.getSystemInfoSync().windowHeight
+		},
+		methods: {
+			...mapActions('user', ['getUserInfo']),
+			// 充值
+			touchPrePay(type, id, price) {
+				console.log(type, id, price, "type, id, price");
+				if(!this.token) return uni.showToast({ title: this.getApp.$t('toast.not.login'), icon: 'none' })
+				this.type = type
+				this.prepay = { id, price }
+				this.isPayShow = true
+				this.$emit('close')
+			},
+			// 获取积分套餐列表
+			getIntegralList() {
+				this.getApp.$request('integral.list').then(res => {
+					if(res.code === 1) {
+						res.data.list && res.data.list.length && (this.integralData = res.data.list)
+					}
+				})
+			},
+			// 获取vip套装列表
+			getVipList() {
+				this.getApp.$request('user.vip').then(res => {
+					if(res.code === 1) {
+						res.data.list && res.data.list.length && (this.vipData = res.data.list)
+					}
+				})
+			}
+		}
+	}
+</script>
+
+<style lang="scss" scoped>
+	.VideoPay {
+		width: 750rpx;
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		z-index: 100;
+		transition: transform 0.5s;
+		transform: translateY(100%);
+		
+		&.active {
+			transform: translateY(0);
+		}
+		
+		.popup {
+			width: 750rpx;
+			background: #000;
+			border-radius: 20rpx 20rpx 0 0;
+			position: absolute;
+			bottom: 0;
+			left: 0;
+			z-index: 1;
+			color: #fff;
+			padding-bottom: 60rpx;
+			border-top: 2rpx solid #333;
+			display: flex;
+			flex-direction: column;
+			
+			.p_head {
+				display: flex;
+				flex-direction: row;
+				justify-content: space-between;
+				position: relative;
+				padding: 30rpx 40rpx;
+
+				.left {
+					flex: 1;
+					display: flex;
+					flex-direction: row;
+					
+					.text1 {
+						font-weight: 700;
+						line-height: 48rpx;
+						font-size: 32rpx;
+						color: #fff;
+					}
+					
+					.text2 {
+						font-size: 24rpx;
+						color: rgba(#fff, 0.5);
+						margin: 0 40rpx;
+						line-height: 48rpx;
+					}
+				}
+				
+				.right {
+					color: #EE7F33;
+					margin-left: 20rpx;
+					font-size: 32rpx;
+				}
+			}
+			
+			.p_text {
+				padding: 0 40rpx;
+				display: flex;
+				flex-direction: row;
+				justify-content: space-between;
+				align-items: center;
+				
+				.left {
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					
+					.text1 {
+						font-size: 28rpx;
+						color: #fff;
+					}
+					
+					.text2 {
+						color: #EE7F33;
+						font-size: 28rpx;
+					}
+				}
+				
+				.right {
+					color: rgba(#fff, 0.7);
+					font-size: 28rpx;
+				}
+			}
+			
+			.p_list {
+				flex: 1;
+				margin-top: 40rpx;
+				display: flex;
+				flex-direction: row;
+				flex-wrap: wrap;
+				
+				.item {
+					height: 180rpx;
+					background: #fff;
+					margin-bottom: 40rpx;
+					position: relative;
+					z-index: 1;
+					color: #000;
+					display: flex;
+					flex-direction: column;
+					border-radius: 20rpx;
+					overflow: hidden;
+					padding-top: 20rpx;
+					
+					&.item2 {
+						background: #EE7F33;
+						
+						.text1 {
+							color: #fff !important;
+						}
+						
+						.text2 {
+							color: #fff !important;
+						}
+					}
+					
+					.content {
+						flex: 1;
+						display: flex;
+						flex-direction: column;
+						justify-content: center;
+						
+						.line1 {
+							display: flex;
+							flex-direction: row;
+							align-items: flex-end;
+							justify-content: center;
+							
+							.text1 {
+								font-size: 36rpx;
+								font-weight: 700;
+								color: #000;
+							}
+							
+							.text2 {
+								font-size: 24rpx;
+								color: #000;
+								transform: scale(0.8);
+							}
+						}
+						
+						.line2 {
+							display: flex;
+							flex-direction: row;
+							align-items: center;
+							justify-content: center;
+							
+							.text1 {
+								font-size: 28rpx;
+								color: #000;
+							}
+							
+							.text2 {
+								color: #EE7F33;
+								font-size: 28rpx;
+							}
+						}
+					}
+					
+					.tips {
+						font-size: 28rpx;
+						text-align: center;
+						background: #EE7F33;
+						padding: 8rpx 0;
+						color: #fff;
+						border-radius: 0 0 20rpx 20rpx;
+						overflow: hidden;
+					}
+					
+					.badge {
+						position: absolute;
+						top: 0;
+						right: 0;
+						padding: 4rpx 16rpx;
+						font-size: 24rpx;
+						background: #EE7F33;
+						border-radius: 0 20rpx 0 20rpx;
+						color: #fff;
+					}
+					
+					.ltip {
+						position: absolute;
+						top: 0;
+						left: 0;
+						font-size: 24rpx;
+						padding: 4rpx 16rpx;
+						background: #EE7F33;
+						border-radius: 20rpx 0 20rpx 0;
+						color: #fff;
+					}
+				}
+			}
+			
+			.p_info {
+				font-size: 24rpx;
+				text-align: center;
+				margin-top: 20rpx;
+				color: #fff;
+			}
+		}
+	}
+</style>
